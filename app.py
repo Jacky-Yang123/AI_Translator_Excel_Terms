@@ -1,35 +1,53 @@
-import os
-import sys
-import streamlit as st
-import warnings
-warnings.filterwarnings('ignore')
+# app.py - 主入口文件（模块化版本）
+# 
+# 这是应用程序的主入口点，负责页面配置和路由
+# 所有功能模块已拆分到独立文件中：
+#   - utils.py: 共享工具函数
+#   - translator.py: 翻译器类
+#   - api_config.py: API配置
+#   - pages/: 各页面模块
 
-from pages.ytdlp_downloader import ytdlp_downloader_app
-from pages.batch_translation import batch_translation_page
+import streamlit as st
+
+# 检查并安装必要的依赖
+try:
+    import jieba
+except ImportError:
+    import subprocess
+    import sys
+    subprocess.check_call([sys.executable, "-m", "pip", "install", "jieba"])
+    import jieba
+
+# 导入页面模块
 from pages.prompt_generator import prompt_generator_page
-from pages.excel_replace import excel_replace_page
-from pages.jacky import jacky_page
-from pages.grand_match import grand_match
-from pages.translation_processor import translation_result_processor_page
-from pages.excel_comparison import excel_comparison_page
+from pages.translation_result import translation_result_processor_page
+from pages.batch_translation import batch_translation_page
 from pages.term_lookup import term_lookup_page
-from pages.excel_matchpro import excel_matchpro_page
-from pages.danmu import danmu_page
+from pages.excel_replace import excel_replace_page
 from pages.excel_sreplace import excel_sreplace_page
+from pages.excel_comparison import excel_comparison_page
 from pages.excel_abc import excel_ABC_page
+from pages.danmu import danmu_page
+from pages.ytdlp_downloader import ytdlp_downloader_app
+from pages.excel_matchpro import excel_matchpro_page
+from pages.grand_match import grand_match
+from pages.jacky import jacky_page
 
 
 def main():
+    """主函数 - 设置页面配置和路由"""
+    
     st.set_page_config(
         page_title="API_AI_Excel翻译分析工具_Jacky",
         page_icon="🎮",
         layout="wide",
         initial_sidebar_state="expanded"
     )
-    
+
+    # 侧边栏页面选择
     st.sidebar.title("🎮 多API Excel智能翻译工具")
-    st.sidebar.markdown("---")
-    
+    st.sidebar.markdown("---\n")
+
     page = st.sidebar.radio(
         "选择功能页面",
         [
@@ -49,8 +67,8 @@ def main():
         ],
         index=0
     )
-    
-    st.sidebar.markdown("---")
+
+    st.sidebar.markdown("---\n")
     st.sidebar.markdown("""
     ### 📖 使用说明
     
@@ -70,20 +88,16 @@ def main():
     - 配置API密钥
     - 上传文件和术语库
     - 自动批量翻译
-    - 支持重试机制
-    
-    ### ⚙️ 版本信息
-    版本: v2.0 合并版
-    作者: Jacky_9S
     """)
-    
+
+    # 根据选择显示不同页面
     if page == "📝 提示词生成器":
         prompt_generator_page()
     elif page == "📊 翻译结果处理":
         translation_result_processor_page()
     elif page == "🔄 批量翻译工具":
         batch_translation_page()
-    elif page == '术语查找':
+    elif page == "术语查找":
         term_lookup_page()
     elif page == "excel查找替换":
         excel_replace_page()
@@ -106,10 +120,4 @@ def main():
 
 
 if __name__ == "__main__":
-    try:
-        import jieba
-    except ImportError:
-        print("jieba 库未安装，正在尝试安装...")
-        os.system(f"{sys.executable} -m pip install jieba")
-        import jieba
     main()

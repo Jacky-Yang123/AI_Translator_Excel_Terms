@@ -1,35 +1,32 @@
-"""
-Pages module - 包含所有页面功能
+# pages 模块初始化文件
+# 导出所有页面函数
 
-此模块包含了应用程序的所有页面功能，每个页面都有独立的文件。
-"""
-
-from . import prompt_generator
-from . import batch_translation
-from . import ytdlp_downloader
-from . import translation_processor
-from . import excel_comparison
-from . import term_lookup
-from . import excel_matchpro
-from . import danmu
-from . import excel_sreplace
-from . import excel_abc
-from . import excel_replace
-from . import jacky
-from . import grand_match
+from .prompt_generator import prompt_generator_page
+from .translation_result import translation_result_processor_page
+from .batch_translation import batch_translation_page
+from .term_lookup import term_lookup_page
+from .excel_replace import excel_replace_page
+from .excel_sreplace import excel_sreplace_page
+from .excel_comparison import excel_comparison_page
+from .excel_abc import excel_ABC_page
+from .danmu import danmu_page
+from .ytdlp_downloader import ytdlp_downloader_app
+from .excel_matchpro import excel_matchpro_page
+from .grand_match import grand_match
+from .jacky import jacky_page
 
 __all__ = [
-    'prompt_generator',
-    'batch_translation',
-    'ytdlp_downloader',
-    'translation_processor',
-    'excel_comparison',
-    'term_lookup',
-    'excel_matchpro',
-    'danmu',
-    'excel_sreplace',
-    'excel_abc',
-    'excel_replace',
-    'jacky',
-    'grand_match'
+    'prompt_generator_page',
+    'translation_result_processor_page',
+    'batch_translation_page',
+    'term_lookup_page',
+    'excel_replace_page',
+    'excel_sreplace_page',
+    'excel_comparison_page',
+    'excel_ABC_page',
+    'danmu_page',
+    'ytdlp_downloader_app',
+    'excel_matchpro_page',
+    'grand_match',
+    'jacky_page',
 ]

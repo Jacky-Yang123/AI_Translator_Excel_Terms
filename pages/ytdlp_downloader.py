@@ -1,205 +1,271 @@
+# pages/ytdlp_downloader.py - yt-dlp 视频下载器页面
+
 import os
-import glob
-import io
+import json
+import time
+import subprocess
+import tempfile
+from pathlib import Path
+from datetime import datetime
+from io import BytesIO
+
 import pandas as pd
 import streamlit as st
-import yt_dlp
-from utils import Utils, HAS_WORDCLOUD
+
+try:
+    from wordcloud import WordCloud
+    HAS_WORDCLOUD = True
+except ImportError:
+    HAS_WORDCLOUD = False
+
+try:
+    import matplotlib.pyplot as plt
+    HAS_MATPLOTLIB = True
+except ImportError:
+    HAS_MATPLOTLIB = False
+
+from utils import Utils
 
 
 def ytdlp_downloader_app():
-    """
-    Streamlit 主函数组件。
-    调用此函数即可在任何页面渲染下载器。
-    """
-    
-    if 'ytdlp_queue' not in st.session_state: 
-        st.session_state.ytdlp_queue = []
-    if 'ytdlp_history' not in st.session_state: 
-        st.session_state.ytdlp_history = []
-    if 'current_meta' not in st.session_state: 
-        st.session_state.current_meta = None
-    if 'available_formats' not in st.session_state: 
-        st.session_state.available_formats = []
-    
-    CONFIG_FILE = "ytdlp_config.json"
-    config = Utils.load_config(CONFIG_FILE)
+    """yt-dlp 视频下载器应用"""
+    st.title("🎬 视频弹幕评论下载器")
+    st.markdown("### 使用yt-dlp下载视频、弹幕和评论")
 
-    st.title("📺 YT-DLP 全能媒体终端")
-    if not HAS_WORDCLOUD:
-        st.warning("⚠️ 检测到未安装 wordcloud 库，词云功能将不可用，但下载功能正常。")
+    # 配置文件路径
+    config_file = os.path.join(os.path.expanduser("~"), ".ytdlp_downloader_config.json")
+    config = Utils.load_config(config_file)
 
+    # 侧边栏配置
     with st.sidebar:
         st.header("⚙️ 设置")
-        new_path = st.text_input("📂 保存路径", value=config['save_path'])
-        if new_path != config['save_path']:
-            config['save_path'] = new_path
-            Utils.save_config(CONFIG_FILE, config)
+
+        save_path = st.text_input(
+            "保存路径",
+            value=config.get("save_path", os.path.join(os.path.expanduser("~"), "Downloads", "Yt-DLP-Data")),
+            key="save_path_input"
+        )
+
+        proxy = st.text_input(
+            "代理设置 (可选)",
+            value=config.get("proxy", ""),
+            placeholder="例如: http://127.0.0.1:7890",
+            key="proxy_input"
+        )
+
+        naming_tmpl = st.text_input(
+            "文件命名模板",
+            value=config.get("naming_tmpl", "%(title)s"),
+            key="naming_tmpl_input"
+        )
+
+        if st.button("💾 保存设置"):
+            config["save_path"] = save_path
+            config["proxy"] = proxy
+            config["naming_tmpl"] = naming_tmpl
+            Utils.save_config(config_file, config)
+            st.success("✅ 设置已保存")
 
         st.divider()
-        st.subheader("🍪 Cookie (VIP/评论)")
-        raw_cookie = st.text_area("粘贴 Cookie (SESSDATA=...)", height=100, help="F12抓取B站请求头中的Cookie")
-        
-        temp_cookie_path = None
-        if raw_cookie and "SESSDATA" in raw_cookie:
-            temp_cookie_path = Utils.create_netscape_cookie_file(raw_cookie)
-            if temp_cookie_path: 
-                st.success("✅ Cookie 已激活")
-        
-        st.divider()
-        config['proxy'] = st.text_input("代理 (Proxy)", value=config['proxy'])
-        if st.button("📂 打开文件夹"): 
-            if os.path.exists(config['save_path']): 
-                Utils.open_folder(config['save_path'])
 
-    tab_dl, tab_review = st.tabs(["⬇️ 下载与解析", "👁️ 资产管理与词云"])
+        if st.button("📂 打开保存文件夹"):
+            if os.path.exists(save_path):
+                Utils.open_folder(save_path)
+            else:
+                os.makedirs(save_path, exist_ok=True)
+                Utils.open_folder(save_path)
 
-    with tab_dl:
-        col1, col2 = st.columns([4,1])
-        with col1: 
-            url = st.text_input("视频链接", key="url_input")
-        with col2: 
-            btn_analyze = st.button("🔍 解析", use_container_width=True, type="primary")
+    # 主界面
+    st.header("📥 下载设置")
 
-        def get_opts():
-            opts = {'quiet': True, 'proxy': config['proxy'] or None, 'no_warnings': True, 'extractor_args': {'bilibili': {'comment_sort': 'time'}}}
-            if temp_cookie_path: 
-                opts['cookiefile'] = temp_cookie_path
-            return opts
+    video_url = st.text_input(
+        "视频链接",
+        placeholder="请输入Bilibili/Niconico视频链接...",
+        key="video_url_input"
+    )
 
-        if btn_analyze and url:
-            with st.spinner("正在解析流..."):
-                try:
-                    with yt_dlp.YoutubeDL(get_opts()) as ydl:
-                        meta = ydl.extract_info(url, download=False)
-                        st.session_state.current_meta = meta
-                        formats = meta.get('formats', [])
-                        heights = sorted(list(set([f.get('height') for f in formats if f.get('height')])), reverse=True)
-                        st.session_state.available_formats = [f"{h}p" for h in heights]
-                except Exception as e: 
-                    st.error(f"解析错误: {e}")
+    col1, col2 = st.columns(2)
 
-        if st.session_state.current_meta:
-            meta = st.session_state.current_meta
-            st.divider()
-            c1, c2 = st.columns([1, 2])
-            with c1: 
-                if meta.get('thumbnail'): 
-                    st.image(meta['thumbnail'], use_container_width=True)
-            with c2:
-                st.subheader(meta.get('title'))
-                quality = st.selectbox("画质选择", ["✨ 最佳 (MP4)"] + st.session_state.available_formats + ["🎵 纯音频"])
-                
-                cd1, cd2 = st.columns(2)
-                with cd1: 
-                    get_danmaku = st.checkbox("导出弹幕 Excel", value=True)
-                with cd2: 
-                    get_comments = st.checkbox("导出评论 Excel", value=True)
-                
-                limit_cmt = 100
-                if get_comments: 
-                    limit_cmt = st.slider("评论抓取量", 10, 5000, 500, step=50)
+    with col1:
+        platform = st.selectbox(
+            "平台",
+            options=["Bilibili", "Niconico", "YouTube", "其他"],
+            key="platform_select"
+        )
 
-                if st.button("➕ 加入队列", type="primary"):
-                    st.session_state.ytdlp_queue.append({
-                        "url": meta['webpage_url'], "title": meta['title'], "quality": quality,
-                        "danmaku": get_danmaku, "comments": get_comments, "limit_cmt": limit_cmt
-                    })
-                    st.success("已加入下载队列")
+    with col2:
+        download_type = st.multiselect(
+            "下载内容",
+            options=["视频", "弹幕", "评论", "字幕"],
+            default=["弹幕"],
+            key="download_type_select"
+        )
 
-        if st.session_state.ytdlp_queue:
-            st.divider()
-            if st.button(f"🚀 开始下载 ({len(st.session_state.ytdlp_queue)} 个任务)", type="primary", use_container_width=True):
-                prog = st.progress(0)
-                for idx, task in enumerate(st.session_state.ytdlp_queue):
-                    opts = get_opts()
-                    opts.update({'outtmpl': os.path.join(config['save_path'], f"{task['title']}.%(ext)s"), 'ignoreerrors': True, 'merge_output_format': 'mp4', 'writeinfojson': True})
-                    
-                    if "纯音频" in task['quality']: 
-                        opts['format'] = 'bestaudio/best'
-                    elif "最佳" in task['quality']: 
-                        opts['format'] = 'bestvideo+bestaudio/best'
-                    else: 
-                        opts['format'] = f"bestvideo[height={task['quality'].replace('p','')}]" + "+bestaudio/best"
+    # Cookie设置
+    with st.expander("🔐 Cookie设置（登录后内容需要）"):
+        cookie_upload = st.file_uploader(
+            "上传Cookie文件",
+            type=['txt'],
+            key="cookie_uploader"
+        )
 
-                    if task['danmaku']: 
-                        opts.update({'writesubtitles': True, 'allsubtitles': True})
-                    if task['comments']: 
-                        opts.update({'getcomments': True, 'max_comments': task['limit_cmt']})
+        cookie_string = st.text_area(
+            "或粘贴Cookie字符串",
+            placeholder="SESSDATA=xxx; bili_jct=xxx; ...",
+            key="cookie_string_input"
+        )
 
-                    try:
-                        with yt_dlp.YoutubeDL(opts) as ydl:
-                            ydl.download([task['url']])
-                            base = os.path.join(config['save_path'], task['title'])
-                            
-                            if task['danmaku']:
-                                xmls = glob.glob(f"{base}*.xml")
-                                if xmls: 
-                                    Utils.process_xml_to_excel(xmls[0], f"{base}_弹幕.xlsx")
-                                    try: 
-                                        os.remove(xmls[0])
-                                    except: 
-                                        pass
-                            
-                            if task['comments']:
-                                json_f = f"{base}.info.json"
-                                if os.path.exists(json_f):
-                                    Utils.process_json_to_excel(json_f, f"{base}_评论.xlsx")
-                                    try: 
-                                        os.remove(json_f)
-                                    except: 
-                                        pass
+    # 下载按钮
+    if st.button("🚀 开始下载", type="primary", use_container_width=True):
+        if not video_url:
+            st.error("❌ 请输入视频链接")
+            return
 
-                            st.session_state.ytdlp_history.append({"title": task['title'], "video_path": f"{base}.mp4", "base_name": base})
-                    except Exception as e: 
-                        st.error(f"任务失败: {e}")
-                    prog.progress((idx+1)/len(st.session_state.ytdlp_queue))
-                
-                st.session_state.ytdlp_queue = []
-                st.success("全部任务完成！")
+        # 创建保存目录
+        os.makedirs(save_path, exist_ok=True)
 
-    with tab_review:
-        if not st.session_state.ytdlp_history: 
-            st.info("暂无历史记录")
-        
-        for item in reversed(st.session_state.ytdlp_history):
-            with st.expander(f"🎥 {item['title']}", expanded=True):
-                c_vid, c_data = st.columns([1, 1.5])
-                with c_vid:
-                    if os.path.exists(item['video_path']): 
-                        st.video(item['video_path'])
-                    else: 
-                        st.warning("文件未找到")
-                
-                with c_data:
-                    dm_path = f"{item['base_name']}_弹幕.xlsx"
-                    cm_path = f"{item['base_name']}_评论.xlsx"
-                    
-                    t1, t2 = st.tabs(["📊 数据", "☁️ 词云"])
-                    with t1:
-                        if os.path.exists(dm_path): 
-                            st.dataframe(pd.read_excel(dm_path), height=150)
-                        if os.path.exists(cm_path): 
-                            st.dataframe(pd.read_excel(cm_path), height=150)
-                    
-                    with t2:
-                        if not HAS_WORDCLOUD:
-                            st.error("词云库缺失，请安装 wordcloud")
-                        else:
-                            wc1, wc2 = st.columns(2)
-                            with wc1:
-                                if os.path.exists(dm_path) and st.button("弹幕词云", key=f"d_{item['title']}"):
-                                    wc = Utils.generate_wordcloud_img(pd.read_excel(dm_path)['内容'].tolist())
-                                    if wc: 
-                                        st.image(wc.to_array(), use_container_width=True)
-                                        buf = io.BytesIO()
-                                        wc.to_image().save(buf, format='PNG')
-                                        st.download_button("下载", buf.getvalue(), "dm_wc.png", "image/png", key=f"dd_{item['title']}")
-                            with wc2:
-                                if os.path.exists(cm_path) and st.button("评论词云", key=f"c_{item['title']}"):
-                                    wc = Utils.generate_wordcloud_img(pd.read_excel(cm_path)['内容'].tolist())
-                                    if wc: 
-                                        st.image(wc.to_array(), use_container_width=True)
-                                        buf = io.BytesIO()
-                                        wc.to_image().save(buf, format='PNG')
-                                        st.download_button("下载", buf.getvalue(), "cm_wc.png", "image/png", key=f"dc_{item['title']}")
+        # 准备Cookie文件
+        cookies_file = None
+        if cookie_upload:
+            temp_cookie = tempfile.NamedTemporaryFile(delete=False, suffix='.txt')
+            temp_cookie.write(cookie_upload.read())
+            temp_cookie.close()
+            cookies_file = temp_cookie.name
+        elif cookie_string:
+            cookies_file = Utils.create_netscape_cookie_file(cookie_string)
+
+        try:
+            import yt_dlp
+
+            progress_bar = st.progress(0)
+            status_text = st.empty()
+
+            output_template = os.path.join(save_path, f"{naming_tmpl}.%(ext)s")
+
+            ydl_opts = {
+                'outtmpl': output_template,
+                'quiet': True,
+                'no_warnings': True,
+            }
+
+            if proxy:
+                ydl_opts['proxy'] = proxy
+
+            if cookies_file:
+                ydl_opts['cookiefile'] = cookies_file
+
+            # 根据下载类型设置选项
+            if "视频" not in download_type:
+                ydl_opts['skip_download'] = True
+
+            if "弹幕" in download_type or "字幕" in download_type:
+                ydl_opts['writesubtitles'] = True
+                ydl_opts['subtitlesformat'] = 'xml'
+
+            if "评论" in download_type:
+                ydl_opts['getcomments'] = True
+                ydl_opts['writeinfojson'] = True
+
+            status_text.text("正在获取视频信息...")
+            progress_bar.progress(20)
+
+            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                info = ydl.extract_info(video_url, download=True)
+                title = info.get('title', 'video')
+
+            progress_bar.progress(80)
+            status_text.text("正在处理下载的文件...")
+
+            results = []
+
+            # 处理弹幕
+            if "弹幕" in download_type:
+                xml_files = list(Path(save_path).glob(f"*{title}*.xml"))
+                for xml_file in xml_files:
+                    excel_path = xml_file.with_suffix('.xlsx')
+                    success, count = Utils.process_xml_to_excel(str(xml_file), str(excel_path))
+                    if success:
+                        results.append(f"弹幕: {count} 条")
+
+            # 处理评论
+            if "评论" in download_type:
+                json_files = list(Path(save_path).glob(f"*{title}*.info.json"))
+                for json_file in json_files:
+                    excel_path = json_file.with_suffix('.comments.xlsx')
+                    success, count = Utils.process_json_to_excel(str(json_file), str(excel_path))
+                    if success:
+                        results.append(f"评论: {count} 条")
+
+            progress_bar.progress(100)
+            status_text.empty()
+            progress_bar.empty()
+
+            if results:
+                st.success(f"✅ 下载完成！视频: {title}")
+                for result in results:
+                    st.info(result)
+            else:
+                st.success(f"✅ 下载完成！视频: {title}")
+
+        except ImportError:
+            st.error("❌ 请安装yt-dlp: pip install yt-dlp")
+        except Exception as e:
+            st.error(f"❌ 下载失败: {e}")
+
+    # 词云生成
+    st.header("☁️ 词云生成")
+
+    uploaded_excel = st.file_uploader(
+        "上传弹幕/评论Excel文件",
+        type=['xlsx', 'xls'],
+        key="wordcloud_uploader"
+    )
+
+    if uploaded_excel:
+        try:
+            df = pd.read_excel(uploaded_excel)
+            st.success(f"✅ 读取成功: {len(df)} 条数据")
+
+            with st.expander("📊 数据预览"):
+                st.dataframe(df.head(20))
+
+            text_col = st.selectbox(
+                "选择文本列",
+                options=df.columns.tolist(),
+                key="text_col_select"
+            )
+
+            if st.button("☁️ 生成词云", use_container_width=True):
+                if not HAS_WORDCLOUD:
+                    st.error("❌ 请安装wordcloud: pip install wordcloud")
+                    return
+
+                if not HAS_MATPLOTLIB:
+                    st.error("❌ 请安装matplotlib: pip install matplotlib")
+                    return
+
+                text_list = df[text_col].dropna().astype(str).tolist()
+                wc = Utils.generate_wordcloud_img(text_list)
+
+                if wc:
+                    fig, ax = plt.subplots(figsize=(10, 5))
+                    ax.imshow(wc, interpolation='bilinear')
+                    ax.axis('off')
+                    st.pyplot(fig)
+
+                    # 保存词云
+                    img_buffer = BytesIO()
+                    wc.to_image().save(img_buffer, format='PNG')
+
+                    st.download_button(
+                        label="📥 下载词云图片",
+                        data=img_buffer.getvalue(),
+                        file_name=f"wordcloud_{datetime.now().strftime('%Y%m%d_%H%M%S')}.png",
+                        mime="image/png",
+                        use_container_width=True
+                    )
+                else:
+                    st.warning("⚠️ 无法生成词云，请检查数据")
+
+        except Exception as e:
+            st.error(f"❌ 处理失败: {e}")

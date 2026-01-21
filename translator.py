@@ -1,10 +1,12 @@
-import pandas as pd
-import requests
-import time
+# translator.py - 核心翻译器类
+
 import re
+import time
 import difflib
-import jieba
+import requests
+import pandas as pd
 import streamlit as st
+import jieba
 
 
 class MultiAPIExcelTranslator:
@@ -17,20 +19,24 @@ class MultiAPIExcelTranslator:
             "Authorization": f"Bearer {api_key}",
             "Content-Type": "application/json"
         }
-        self.context_history = {}
+        self.context_history = {}  # 按语言分别存储上下文
         self.term_dict = {}
         self.role_column = None
         self.context_size = context_size
         self.max_retries = max_retries
-        
-        self.term_base_dict = {}
-        
+
+        # 改为按语言存储术语库
+        self.term_base_dict = {}  # {语言: [{source: xxx, target: xxx}]}
+        self.term_base_list = []  # 单语言术语库列表
+
         self.role_personality_dict = {}
         self.current_text_terms = {}
         self.current_role_personality = None
         self.target_languages = ["英文"]
         self.language_column_names = {"英文": "英文翻译结果"}
+        self.target_language = "英文"
 
+        # 新增：角色映射表
         self.role_mapping = {}
         self.enable_fuzzy_match = False
         self.fuzzy_threshold = 0.6
@@ -183,7 +189,7 @@ class MultiAPIExcelTranslator:
         """为指定语言添加上下文（确保语言独立）"""
         if language not in self.context_history:
             self.context_history[language] = []
-        
+
         self.context_history[language].append((original, translation, role))
         if len(self.context_history[language]) > self.context_size:
             self.context_history[language].pop(0)
@@ -207,6 +213,7 @@ class MultiAPIExcelTranslator:
         words = self.tokenize_chinese_text(text)
         matched_terms = {}
 
+        # 词级别匹配
         for word in words:
             for term_entry in self.term_base_dict[language]:
                 if term_entry['source'] == word:
@@ -215,6 +222,7 @@ class MultiAPIExcelTranslator:
                     if term_entry['target'] not in matched_terms[word]:
                         matched_terms[word].append(term_entry['target'])
 
+        # 短语级别匹配
         for term_entry in self.term_base_dict[language]:
             term = term_entry['source']
             if term in text:
@@ -225,15 +233,37 @@ class MultiAPIExcelTranslator:
 
         return matched_terms
 
-    def build_term_base_prompt(self, text, language):
+    def build_term_base_prompt(self, text, language="英文"):
         """为指定语言构建术语库提示"""
+        # 尝试使用多语言术语库
         matched_terms = self.find_matched_terms(text, language)
+
+        # 如果没有多语言术语库，使用单语言术语库
+        if not matched_terms and self.term_base_list:
+            words = self.tokenize_chinese_text(text)
+            matched_terms = {}
+
+            for word in words:
+                for term_entry in self.term_base_list:
+                    if term_entry['source'] == word:
+                        if word not in matched_terms:
+                            matched_terms[word] = []
+                        if term_entry['target'] not in matched_terms[word]:
+                            matched_terms[word].append(term_entry['target'])
+
+            for term_entry in self.term_base_list:
+                term = term_entry['source']
+                if term in text:
+                    if term not in matched_terms:
+                        matched_terms[term] = []
+                    if term_entry['target'] not in matched_terms[term]:
+                        matched_terms[term].append(term_entry['target'])
 
         if not matched_terms:
             return ""
 
         term_base_str = f"\n\n### 术语库匹配：\n"
-        
+
         for orig, trans_list in matched_terms.items():
             if len(trans_list) == 1:
                 term_base_str += f"- 「{orig}」 → {language}译名：「{trans_list[0]}」\n"
@@ -264,13 +294,14 @@ class MultiAPIExcelTranslator:
         """设置目标语言列表和对应的列名"""
         self.target_languages = languages
         self.language_column_names = column_names
+        # 为每种语言初始化独立的上下文历史
         for lang in languages:
             if lang not in self.context_history:
                 self.context_history[lang] = []
-                
+
     def set_target_language(self, language):
         self.target_language = language
-        
+
     def get_language_specific_requirements(self, language):
         language_requirements = {
             "英文": """
@@ -360,6 +391,7 @@ class MultiAPIExcelTranslator:
         return text
 
     def _translate_single_attempt(self, text, target_language, custom_requirements="", role=None):
+        # 为当前语言构建独立的上下文和术语提示
         context_prompt = self.build_context_prompt(target_language)
         term_base_prompt = self.build_term_base_prompt(text, target_language)
         role_personality_prompt = self.build_role_personality_prompt(role) if role else ""
@@ -418,8 +450,9 @@ class MultiAPIExcelTranslator:
         response.raise_for_status()
         result = response.json()
         translated_text = result["choices"][0]["message"]["content"].strip()
-        
+
         translated_text = self.clean_translation(translated_text)
+        # 将翻译结果添加到该语言的独立上下文中
         self.add_to_context(text, translated_text, role, target_language)
 
         return translated_text
@@ -454,39 +487,41 @@ class MultiAPIExcelTranslator:
         self.current_text_terms = {}
         self.current_role_personality = None
         self.role_mapping = {}
-        
+
     def load_term_base(self, df, source_col, target_col):
         """加载术语库 - 支持重复术语"""
         try:
+            # 构建术语库列表，支持重复术语
             self.term_base_list = []
             missing_count = 0
-            
+
             for _, row in df.iterrows():
                 source = row[source_col]
                 target = row[target_col]
-                
+
                 if pd.isna(source) or pd.isna(target):
                     missing_count += 1
                     continue
-                    
+
                 source = str(source).strip()
                 target = str(target).strip()
-                
+
                 if source and target:
+                    # 不再检查重复，直接添加到列表
                     self.term_base_list.append({
                         'source': source,
                         'target': target
                     })
-            
+
             st.success(f"✅ 成功加载术语: {len(self.term_base_list)} 条")
             if missing_count > 0:
                 st.warning(f"⚠️ 跳过 {missing_count} 条不完整的记录")
-            
+
             return True
         except Exception as e:
             st.error(f"❌❌ 加载术语库失败: {e}")
             return False
-            
+
     def load_term_base_multilang(self, df, source_col, target_cols_dict):
         """
         加载多语言术语库
@@ -496,12 +531,12 @@ class MultiAPIExcelTranslator:
         """
         try:
             self.term_base_dict = {}
-            
+
             for language, target_col in target_cols_dict.items():
                 if target_col not in df.columns:
                     st.warning(f"⚠️ 术语库中未找到 {language} 对应的列: {target_col}")
                     continue
-                
+
                 self.term_base_dict[language] = []
                 missing_count = 0
 
@@ -517,6 +552,7 @@ class MultiAPIExcelTranslator:
                     target = str(target).strip()
 
                     if source and target:
+                        # 将原文添加到分词词典
                         try:
                             self.chinese_tokenizer.add_word(source)
                         except:
@@ -531,9 +567,11 @@ class MultiAPIExcelTranslator:
                 if missing_count > 0:
                     st.info(f"   跳过 {missing_count} 条不完整的 {language} 术语")
 
+            # 显示术语库统计
             total_terms = sum(len(terms) for terms in self.term_base_dict.values())
             st.success(f"📊 总计加载术语: {total_terms} 条，覆盖 {len(self.term_base_dict)} 种语言")
-            
+
+            # 显示术语示例
             with st.expander("📋 查看术语库示例"):
                 for language, terms in self.term_base_dict.items():
                     if terms:
@@ -544,7 +582,7 @@ class MultiAPIExcelTranslator:
                             st.write(f"  ... 还有 {len(terms)-5} 条")
 
             return True
-            
+
         except Exception as e:
             st.error(f"❌ 加载多语言术语库失败: {e}")
             import traceback
@@ -594,96 +632,3 @@ class MultiAPIExcelTranslator:
             count += 1
             if count >= 5:
                 break
-
-
-def get_api_providers():
-    providers = {
-        "DeepSeek": {
-            "url": "https://api.deepseek.com/v1/chat/completions",
-            "models": ["deepseek-chat", "deepseek-coder"]
-        },
-        "OpenAI": {
-            "url": "https://api.openai.com/v1/chat/completions",
-            "models": ["gpt-3.5-turbo", "gpt-4", "gpt-4-turbo"]
-        },
-        "自定义API": {
-            "url": "https://tb.api.mkeai.com/v1/chat/completions",
-            "models": ["custom-model"]
-        }
-    }
-    return providers
-
-
-def render_role_matching_interface(translator, df, role_col):
-    """渲染角色匹配确认界面"""
-    st.header("🎭 角色模糊匹配确认")
-
-    fuzzy_matches = translator.analyze_role_matches(df, role_col)
-
-    if not fuzzy_matches:
-        st.success("✅ 所有角色都已精确匹配，无需确认")
-        return True
-
-    st.warning(f"⚠️ 发现 {len(fuzzy_matches)} 个需要确认的角色匹配")
-    st.info("💡 提示：系统会自动为相同的角色名批量应用您的选择")
-
-    if 'role_confirmations' not in st.session_state:
-        st.session_state.role_confirmations = {}
-
-    with st.form("role_matching_form"):
-        for idx, (original_role, candidates) in enumerate(fuzzy_matches.items()):
-            st.markdown(f"---")
-            st.markdown(f"### 角色 {idx + 1}: `{original_role}`")
-
-            cleaned = translator.clean_role_name(original_role)
-            st.caption(f"清理后: `{cleaned}`")
-
-            role_count = len(df[df[role_col] == original_role])
-            st.caption(f"📊 在文档中出现 **{role_count}** 次")
-
-            options = ["❌ 不匹配任何角色"] + [
-                f"✅ {candidate} (相似度: {score:.2%})"
-                for candidate, score in candidates
-            ]
-
-            default_idx = 1 if candidates else 0
-
-            selected = st.radio(
-                f"请选择匹配的官方角色:",
-                options=options,
-                index=default_idx,
-                key=f"role_match_{idx}"
-            )
-
-            if selected.startswith("✅"):
-                matched_role = selected.split("(")[0].replace("✅", "").strip()
-                st.session_state.role_confirmations[original_role] = matched_role
-            else:
-                st.session_state.role_confirmations[original_role] = None
-
-            if st.session_state.role_confirmations.get(original_role):
-                matched = st.session_state.role_confirmations[original_role]
-                personality = translator.role_personality_dict.get(matched)
-                if personality:
-                    with st.expander("👤 查看角色性格描述"):
-                        st.write(personality)
-
-        submitted = st.form_submit_button("✅ 确认所有匹配", use_container_width=True)
-
-        if submitted:
-            for original_role, matched_role in st.session_state.role_confirmations.items():
-                if matched_role:
-                    translator.role_mapping[original_role] = matched_role
-
-            st.success(f"✅ 已确认 {len([v for v in st.session_state.role_confirmations.values() if v])} 个角色映射")
-
-            with st.expander("📋 查看映射摘要"):
-                for orig, matched in st.session_state.role_confirmations.items():
-                    if matched:
-                        st.write(f"• `{orig}` → `{matched}`")
-                    else:
-                        st.write(f"• `{orig}` → ❌ 未匹配")
-
-            return True
-
-    return False
