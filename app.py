@@ -32,6 +32,7 @@ from pages.ytdlp_downloader import ytdlp_downloader_app
 from pages.excel_matchpro import excel_matchpro_page
 from pages.grand_match import grand_match
 from pages.jacky import jacky_page
+from pages.format_factory import format_factory_page
 
 
 def main():
@@ -63,7 +64,8 @@ def main():
             "🔍 抓弹幕（只支持nikoniko)",
             "blbl视频弹幕评论下载",
             "文件夹单向匹配程序",
-            "模板一键匹配"
+            "模板一键匹配",
+            "🏭 格式工厂"
         ],
         index=0
     )
@@ -117,6 +119,8 @@ def main():
         excel_matchpro_page()
     elif page == "模板一键匹配":
         grand_match()
+    elif page == "🏭 格式工厂":
+        format_factory_page()
 
 
 if __name__ == "__main__":
