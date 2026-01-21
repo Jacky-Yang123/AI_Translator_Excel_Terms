@@ -33,6 +33,8 @@ from pages.excel_matchpro import excel_matchpro_page
 from pages.grand_match import grand_match
 from pages.jacky import jacky_page
 from pages.format_factory import format_factory_page
+from pages.file_scanner import file_scanner_page
+from pages.profile_analysis import profile_analysis_page
 
 
 def main():
@@ -45,7 +47,7 @@ def main():
         initial_sidebar_state="expanded"
     )
 
-    # 黑白渐变 ins 简约风格 CSS
+    # 渐变
     st.markdown("""
     <style>
     /* ========== 全局样式 ========== */
@@ -465,7 +467,9 @@ def main():
             "blbl视频弹幕评论下载",
             "文件夹单向匹配程序",
             "模板一键匹配",
-            "🏭 格式工厂"
+            "🏭 格式工厂",
+            "📁 文件扫描仪",
+            "📑 文献综述分析"
         ],
         index=0
     )
@@ -521,6 +525,10 @@ def main():
         grand_match()
     elif page == "🏭 格式工厂":
         format_factory_page()
+    elif page == "📁 文件扫描仪":
+        file_scanner_page()
+    elif page == "📑 文献综述分析":
+        profile_analysis_page()
 
 
 if __name__ == "__main__":
