@@ -12,7 +12,7 @@
 - **翻译结果处理**：将AI翻译结果与原始Excel文件自动合并
 
 ### 2. Excel数据处理
-- **Excel查找替换**：在多个Excel文件中批量查找和替换内容
+- **Excel查找替换**：在多个Excel文件中批量查找和替换内容，支持大小写敏感/不敏感模式
 - **Excel高级替换**：基于条件的精准查找和替换功能
 - **Excel表格对比**：对比两个Excel文件的差异，识别新增、删除和共同内容
 - **ExcelABC操作**：批量处理Excel文件，支持删除、替换、修改中间值等操作
@@ -50,7 +50,7 @@ wordcloud
    ```
 3. 运行应用：
    ```bash
-   streamlit run app_new.py
+   streamlit run app.py
    ```
 
 ## 🚀 使用指南
@@ -99,37 +99,45 @@ wordcloud
 
 ```
 ExcelTranslator_Pro/
-├── app_new.py              # 主应用入口
+├── app.py                  # 主应用入口（路由）
 ├── translator.py           # 翻译核心模块
 ├── utils.py                # 工具函数
+├── api_config.py           # API配置
 ├── requirements.txt        # 项目依赖
 ├── model_GRAND_match/      # 模板匹配模型
 │   └── model_grand_match.py
-└── pages/                  # 功能页面
-    ├── batch_translation.py        # 批量翻译
-    ├── prompt_generator.py         # 提示词生成器
-    ├── other_pages.py              # 其他功能页面集合
-    ├── ytdlp_downloader.py         # 媒体下载
-    ├── danmu.py                    # 弹幕抓取
-    ├── excel_replace.py            # Excel查找替换
-    ├── excel_sreplace.py           # Excel高级替换
-    ├── excel_comparison.py         # Excel表格对比
-    ├── excel_abc.py                # ExcelABC操作
-    ├── term_lookup.py              # 术语查找
-    ├── grand_match.py              # 模板一键匹配
-    ├── excel_matchpro.py           # 文件夹单向匹配
-    └── jacky.py                    # 作者主页
+└── pages/                  # 功能页面模块
+    ├── __init__.py              # 模块初始化
+    ├── batch_translation.py     # 批量翻译
+    ├── prompt_generator.py      # 提示词生成器
+    ├── translation_result.py    # 翻译结果处理
+    ├── ytdlp_downloader.py      # 媒体下载
+    ├── danmu.py                 # 弹幕抓取
+    ├── excel_replace.py         # Excel查找替换
+    ├── excel_sreplace.py        # Excel高级替换
+    ├── excel_comparison.py      # Excel表格对比
+    ├── excel_abc.py             # ExcelABC操作
+    ├── term_lookup.py           # 术语查找
+    ├── grand_match.py           # 模板一键匹配
+    ├── excel_matchpro.py        # 文件夹单向匹配
+    └── jacky.py                 # 作者主页
 ```
 
 ## 📝 使用注意事项
 
 1. **API密钥安全**：API密钥仅在当前会话中使用，不会被保存到文件
-2. **文件格式**：支持Excel文件格式（.xlsx, .xls）
+2. **文件格式**：支持Excel文件格式（.xlsx, .xls, .xlsm, .xlsb）
 3. **性能优化**：处理大量数据时建议分批处理
 4. **网络要求**：使用在线翻译API和媒体下载功能需要稳定的网络连接
 5. **Cookie使用**：使用B站VIP功能时需要正确配置Cookie
 
 ## 🔄 更新日志
+
+### v2.1 模块化版本 (2026-01-21)
+- 将单体 app.py（6400+行）拆分为17个独立模块
+- 新增 api_config.py 配置模块
+- 修复大小写不敏感替换的bug
+- 优化代码结构和可维护性
 
 ### v2.0 合并版
 - 整合了所有功能模块
@@ -144,12 +152,12 @@ ExcelTranslator_Pro/
 ## 📧 联系方式
 
 作者：Jacky_9S
-版本：v2.0 合并版
+版本：v2.1 模块化版本
 
 ---
 
 **使用说明**：
-1. 运行`streamlit run app_new.py`启动应用
+1. 运行`streamlit run app.py`启动应用
 2. 在左侧导航栏选择需要的功能
 3. 根据页面提示进行操作
 4. 查看结果并下载处理后的文件
