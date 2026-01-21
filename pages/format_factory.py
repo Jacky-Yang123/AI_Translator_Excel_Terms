@@ -662,6 +662,10 @@ def format_factory_page():
         )
         
         if uploaded_video:
+            # 预览原始视频
+            st.markdown("##### 📹 原始视频预览")
+            st.video(uploaded_video)
+
             # 保存到临时文件
             with tempfile.NamedTemporaryFile(delete=False, suffix=f'.{uploaded_video.name.split(".")[-1]}') as tmp:
                 tmp.write(uploaded_video.getvalue())
@@ -683,6 +687,9 @@ def format_factory_page():
                     if success and os.path.exists(output_path):
                         st.success("✅ 转换成功！")
                         
+                        st.markdown("##### 🎬 处理后预览")
+                        st.video(output_path)
+
                         with open(output_path, 'rb') as f:
                             st.download_button(
                                 "📥 下载",
@@ -712,6 +719,9 @@ def format_factory_page():
                     if success and os.path.exists(output_path):
                         st.success("✅ 剪辑成功！")
                         
+                        st.markdown("##### 🎬 处理后预览")
+                        st.video(output_path)
+
                         with open(output_path, 'rb') as f:
                             st.download_button(
                                 "📥 下载",
@@ -737,6 +747,9 @@ def format_factory_page():
                     if success and os.path.exists(output_path):
                         st.success("✅ 处理成功！")
                         
+                        st.markdown("##### 🎬 处理后预览")
+                        st.video(output_path)
+
                         with open(output_path, 'rb') as f:
                             st.download_button(
                                 "📥 下载",
@@ -762,6 +775,9 @@ def format_factory_page():
                     if success and os.path.exists(output_path):
                         st.success("✅ 处理成功！")
                         
+                        st.markdown("##### 🎬 处理后预览")
+                        st.video(output_path)
+
                         with open(output_path, 'rb') as f:
                             st.download_button(
                                 "📥 下载",
@@ -785,6 +801,9 @@ def format_factory_page():
                     if success and os.path.exists(output_path):
                         st.success("✅ 提取成功！")
                         
+                        st.markdown("##### 🎵 提取音频预览")
+                        st.audio(output_path)
+
                         with open(output_path, 'rb') as f:
                             st.download_button(
                                 "📥 下载MP3",
@@ -808,6 +827,9 @@ def format_factory_page():
                     if success and os.path.exists(output_path):
                         st.success("✅ 处理成功！")
                         
+                        st.markdown("##### 🎬 处理后预览")
+                        st.video(output_path)
+
                         with open(output_path, 'rb') as f:
                             st.download_button(
                                 "📥 下载",
@@ -837,6 +859,9 @@ def format_factory_page():
                         
                         st.success(f"✅ 压缩成功！大小减少 {reduction:.1f}%")
                         
+                        st.markdown("##### 🎬 处理后预览")
+                        st.video(output_path)
+
                         with open(output_path, 'rb') as f:
                             st.download_button(
                                 "📥 下载",
@@ -878,6 +903,10 @@ def format_factory_page():
             )
             
             if uploaded_audio:
+                # 预览原始音频
+                st.markdown("##### 🎵 原始音频预览")
+                st.audio(uploaded_audio)
+
                 input_format = uploaded_audio.name.split('.')[-1].lower()
                 
                 # 显示音频信息
@@ -906,6 +935,9 @@ def format_factory_page():
                         if result:
                             st.success("✅ 转换成功！")
                             
+                            st.markdown("##### 🎧 处理后预览")
+                            st.audio(result, format=f'audio/{output_format}')
+
                             output_name = Path(uploaded_audio.name).stem + f'.{output_format}'
                             st.download_button(
                                 "📥 下载",
@@ -936,6 +968,9 @@ def format_factory_page():
                         if result:
                             st.success("✅ 剪辑成功！")
                             
+                            st.markdown("##### 🎧 处理后预览")
+                            st.audio(result, format=f'audio/{input_format}')
+
                             output_name = Path(uploaded_audio.name).stem + f'_trimmed.{input_format}'
                             st.download_button(
                                 "📥 下载",
@@ -966,6 +1001,9 @@ def format_factory_page():
                         if result:
                             st.success("✅ 处理成功！")
                             
+                            st.markdown("##### 🎧 处理后预览")
+                            st.audio(result, format=f'audio/{input_format}')
+
                             output_name = Path(uploaded_audio.name).stem + f'_faded.{input_format}'
                             st.download_button(
                                 "📥 下载",
@@ -993,6 +1031,9 @@ def format_factory_page():
                         if result:
                             st.success("✅ 处理成功！")
                             
+                            st.markdown("##### 🎧 处理后预览")
+                            st.audio(result, format=f'audio/{input_format}')
+
                             output_name = Path(uploaded_audio.name).stem + f'_speed{speed}x.{input_format}'
                             st.download_button(
                                 "📥 下载",
@@ -1019,6 +1060,9 @@ def format_factory_page():
                         if result:
                             st.success("✅ 处理成功！")
                             
+                            st.markdown("##### 🎧 处理后预览")
+                            st.audio(result, format=f'audio/{input_format}')
+
                             output_name = Path(uploaded_audio.name).stem + f'_vol{volume_db}db.{input_format}'
                             st.download_button(
                                 "📥 下载",
@@ -1041,6 +1085,9 @@ def format_factory_page():
                         if result:
                             st.success("✅ 处理成功！")
                             
+                            st.markdown("##### 🎧 处理后预览")
+                            st.audio(result, format=f'audio/{input_format}')
+
                             output_name = Path(uploaded_audio.name).stem + f'_reversed.{input_format}'
                             st.download_button(
                                 "📥 下载",
@@ -1083,6 +1130,9 @@ def format_factory_page():
                     if result:
                         st.success("✅ 合并成功！")
                         
+                        st.markdown("##### 🎧 处理后预览")
+                        st.audio(result, format=f'audio/{output_format}')
+
                         st.download_button(
                             "📥 下载",
                             data=result,
