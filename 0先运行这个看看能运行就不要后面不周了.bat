@@ -1,0 +1,1 @@
+python312\Scripts\streamlit.exe run app.py

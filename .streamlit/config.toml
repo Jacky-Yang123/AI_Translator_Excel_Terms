@@ -1,0 +1,7 @@
+[theme]
+# 黑白渐变 ins 简约风格主题
+primaryColor = "#ffffff"
+backgroundColor = "#0a0a0a"
+secondaryBackgroundColor = "#1a1a1a"
+textColor = "#e0e0e0"
+font = "sans serif"
